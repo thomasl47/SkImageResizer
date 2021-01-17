@@ -1,6 +1,7 @@
 using SkiaSharp;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SkImageResizer
@@ -43,7 +44,7 @@ namespace SkImageResizer
             }
         }
 
-        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale, CancellationToken token)
         {
             if (!Directory.Exists(destPath))
             {
@@ -54,8 +55,9 @@ namespace SkImageResizer
             var allFiles = FindImages(sourcePath);
             foreach (var filePath in allFiles)
             {
-                tasks.Add(Task.Run(async () =>
+                tasks.Add(Task.Run( () =>
                {
+                   token.ThrowIfCancellationRequested();
                    var bitmap = SKBitmap.Decode(filePath);
                    var imgPhoto = SKImage.FromBitmap(bitmap);
                    var imgName = Path.GetFileNameWithoutExtension(filePath);
@@ -72,9 +74,9 @@ namespace SkImageResizer
                    using var scaledImage = SKImage.FromBitmap(scaledBitmap);
                    using var data = scaledImage.Encode(SKEncodedImageFormat.Jpeg, 100);
                    using var s = File.OpenWrite(Path.Combine(destPath, imgName + ".jpg"));
+                   token.ThrowIfCancellationRequested();
                    data.SaveTo(s);
-                   await Task.Yield();
-               }));
+               }, token));
             }
             await Task.WhenAll(tasks.ToArray());
         }
